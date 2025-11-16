@@ -12,7 +12,7 @@ endif()
 project ("xray-monitor")
 
 # Добавьте источник в исполняемый файл этого проекта.
-add_executable (xray-monitor "xray-monitor.cpp" "xray-monitor.h")
+add_executable (xray-monitor "main.cpp"  "Config.h" "Config.cpp" "version.h" "Logger.h" "Logger.cpp" "App.h" "App.cpp" "utils.h" "utils.cpp" "State.h" "State.cpp" "TelegramBot.h" "TelegramBot.cpp" "XRayClient.h" "XRayClient.cpp")
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET xray-monitor PROPERTY CXX_STANDARD 20)
