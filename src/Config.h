@@ -1,27 +1,25 @@
-#ifndef CONFIG_H
+﻿#ifndef CONFIG_H
 #define CONFIG_H
 
 #include <string>
 #include <vector>
 #include <unordered_map>
-#include <boost/property_tree/ptree.hpp>
+#include <boost/json.hpp>
 #include <boost/program_options.hpp>
-
 
 struct User {
     std::string id;
     std::string email;
     std::string ip;
-    bool connected;
-    time_t lastSeen;
-    uint64_t downlink;
-    uint64_t uplink;
+    bool connected = false;
+    time_t lastSeen = 0;
+    uint64_t downlink = 0;
+    uint64_t uplink = 0;
 };
 
-
 struct XRayConfig {
-    std::string apiAddress;
-    int apiPort;
+    std::string apiAddress = "127.0.0.1";
+    int apiPort = 0;
     std::string accessLogPath;
     std::unordered_map<std::string, User> users;
 
@@ -29,8 +27,8 @@ struct XRayConfig {
     void validate() const;
 
 private:
-    void parseInbounds(const boost::property_tree::ptree& pt);
-    void parseUsers(const boost::property_tree::ptree& pt);
+    void parseInbounds(const boost::json::object& root);
+    void parseUsers(const boost::json::object& root);
 };
 
 class AppConfig {
