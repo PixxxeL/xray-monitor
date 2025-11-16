@@ -187,7 +187,7 @@ void AppConfig::validate() const {
 
 void AppConfig::printHelp(const po::options_description& desc) const {
     std::cout << "XRay Monitor - VLESS connection monitoring tool\n\n"
-        << "Usage: xray_monitor [options]\n\n"
+        << "Usage: xray-monitor [options]\n\n"
         << desc << std::endl;
 }
 
