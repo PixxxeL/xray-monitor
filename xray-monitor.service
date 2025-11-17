@@ -1,0 +1,14 @@
+[Unit]
+Description=XRay Connection Monitor
+After=network.target xray.service
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/xray-monitor
+Restart=on-failure
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
