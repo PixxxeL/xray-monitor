@@ -1,4 +1,4 @@
-﻿#include "Config.h"
+#include "Config.h"
 #include "App.h"
 #include "Logger.h"
 #include <iostream>

@@ -1,4 +1,4 @@
-﻿#include "Config.h"
+#include "Config.h"
 #include "Logger.h"
 #include "version.h"
 #include <iostream>
@@ -212,12 +212,12 @@ AppConfig AppConfig::parseCommandLine(int argc, char* argv[]) {
         exit(0);
     }
 
-    if (vm.count("xray-config-path"))       config.xrayConfigPath = vm["xray-config-path"].as<std::string>();
-    if (vm.count("log-level"))              config.logLevelStr = vm["log-level"].as<std::string>();
-    if (vm.count("log-filepath"))           config.logFilePath = vm["log-filepath"].as<std::string>();
-    if (vm.count("interval"))               config.interval = vm["interval"].as<int>();
-    if (vm.count("telegram-token"))         config.telegramToken = vm["telegram-token"].as<std::string>();
-    if (vm.count("telegram-channel"))       config.telegramChannel = vm["telegram-channel"].as<std::string>();
+    if (vm.count("xray-config-path")) config.xrayConfigPath = vm["xray-config-path"].as<std::string>();
+    if (vm.count("log-level"))        config.logLevelStr = vm["log-level"].as<std::string>();
+    if (vm.count("log-filepath"))     config.logFilePath = vm["log-filepath"].as<std::string>();
+    if (vm.count("interval"))         config.interval = vm["interval"].as<int>();
+    if (vm.count("telegram-token"))   config.telegramToken = vm["telegram-token"].as<std::string>();
+    if (vm.count("telegram-channel")) config.telegramChannel = vm["telegram-channel"].as<std::string>();
 
     return config;
 }

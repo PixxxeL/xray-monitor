@@ -8,8 +8,7 @@
 // Static member for signal handling
 static App* g_appInstance = nullptr;
 
-App::App(const AppConfig& appConfig)
-    : appConfig(appConfig) {
+App::App(const AppConfig& appConfig) : appConfig(appConfig) {
 }
 
 int App::run() {
@@ -47,14 +46,12 @@ int App::run() {
         }
 
         // Shutdown
-        Logger::getInstance().log(LogLevel::INFO, "Завершен мониторинг подключений xray");
-
+        std::string completed = "Xray connection monitoring completed";
+        Logger::getInstance().log(LogLevel::INFO, completed);
         if (telegramBot->isEnabled()) {
-            telegramBot->sendMessage("Мониторинг подключений xray завершен");
+            telegramBot->sendMessage(completed);
         }
-
         return 0;
-
     }
     catch (const std::exception& e) {
         Logger::getInstance().log(LogLevel::ERROR, "Fatal error in App::run: " + std::string(e.what()));
@@ -117,15 +114,15 @@ void App::sendStartupMessages() {
     std::stringstream telegramMsg;
     std::stringstream logMsg;
 
-    telegramMsg << "*Запущен мониторинг подключений xray*\n\n";
-    telegramMsg << "К серверу подключены пользователи:\n";
+    telegramMsg << "*Xray connection monitoring has been launched*\n\n";
+    telegramMsg << "Users are connected to the server:\n";
 
-    logMsg << "Запущен мониторинг подключений xray. Подключенные пользователи: ";
+    logMsg << "Xray connection monitoring has been launched. Connected users: ";
 
     bool firstUser = true;
     for (const auto& pair : connectedUsers) {
         const auto& user = pair.second;
-        telegramMsg << "• " << user.email << " " << user.ip << " " << user.id << "\n";
+        telegramMsg << "вЂў " << user.email << " " << user.ip << " " << user.id << "\n";
 
         if (!firstUser) {
             logMsg << ", ";
@@ -151,10 +148,10 @@ void App::sendNewConnectionMessages(const std::unordered_map<std::string, User>&
             std::stringstream telegramMsg;
             std::stringstream logMsg;
 
-            telegramMsg << "*К серверу xray подключились пользователи:*\n\n";
-            telegramMsg << "• " << user.email << " " << user.ip << " " << user.id << " " << utils::formatTime(user.lastSeen);
+            telegramMsg << "*Users have connected to the xray server:*\n\n";
+            telegramMsg << "вЂў " << user.email << " " << user.ip << " " << user.id << " " << utils::formatTime(user.lastSeen);
 
-            logMsg << "Новое подключение: " << user.email << "(" << user.ip << ") в " << utils::formatTime(user.lastSeen);
+            logMsg << "New connection: " << user.email << "(" << user.ip << ") РІ " << utils::formatTime(user.lastSeen);
 
             if (telegramBot->isEnabled()) {
                 telegramBot->sendMessage(telegramMsg.str());

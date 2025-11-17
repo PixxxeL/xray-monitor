@@ -1,6 +1,6 @@
 # XRay Monitor
 
-Lightweight XRay monitor daemon with Telegram integration 
+Lightweight XRay monitor daemon with Telegram integration. So far vless protocol only.
 
 ## Dev Requiremts
 
