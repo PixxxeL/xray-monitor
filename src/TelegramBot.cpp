@@ -59,7 +59,7 @@ bool TelegramBot::sendMessage(const std::string& message) {
         }
         else {
             Logger::getInstance().log(LogLevel::ERROR,
-                "Failed to send Telegram message: " + std::to_string(res.result_int()) + " " + res.reason().to_string());
+                "Failed to send Telegram message: " + std::to_string(res.result_int()) + " " + std::string(res.reason()));
             return false;
         }
     }

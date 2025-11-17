@@ -63,7 +63,7 @@ int App::run() {
 }
 
 void App::initialize() {
-    Logger::getInstance().initialize(appConfig.logLevel, appConfig.logFilePath);
+    Logger::getInstance().initialize(appConfig.logLevelStr, appConfig.logFilePath);
     Logger::getInstance().log(LogLevel::INFO, "Starting XRay Monitor");
 
     // Parse XRay config

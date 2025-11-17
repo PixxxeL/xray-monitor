@@ -11,8 +11,20 @@ endif()
 
 project ("xray-monitor")
 
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+find_package(Boost 1.83 REQUIRED COMPONENTS program_options json system)
+
 # Добавьте источник в исполняемый файл этого проекта.
 add_executable (xray-monitor "src/main.cpp"  "src/Config.h" "src/Config.cpp" "src/version.h" "src/Logger.h" "src/Logger.cpp" "src/App.h" "src/App.cpp" "src/utils.h" "src/utils.cpp" "src/State.h" "src/State.cpp" "src/TelegramBot.h" "src/TelegramBot.cpp" "src/XRayClient.h" "src/XRayClient.cpp")
+
+target_link_libraries(xray-monitor
+    PRIVATE
+        Boost::json
+        Boost::program_options
+        Boost::system
+)
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET xray-monitor PROPERTY CXX_STANDARD 20)

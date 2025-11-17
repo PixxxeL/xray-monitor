@@ -5,22 +5,22 @@
 #include <fstream>
 #include <sstream>
 #include <system_error>
+#include <optional>
 
 namespace po = boost::program_options;
 namespace bj = boost::json;
 
 // Вспомогательные функции для безопасного доступа
-template<typename T>
-std::optional<T> get_optional_string(const bj::object& obj, const char* key) {
-    auto it = obj.find(key);
-    if (it != obj.end() && it->value().is_string()) {
+std::optional<std::string>
+get_optional_string(const bj::object& obj, const char* key) {
+    if (auto it = obj.find(key); it != obj.end() && it->value().is_string()) {
         return std::string(it->value().as_string());
     }
     return std::nullopt;
 }
 
-template<typename T>
-std::optional<int64_t> get_optional_int64(const bj::object& obj, const char* key) {
+std::optional<int64_t>
+get_optional_int64(const bj::object& obj, const char* key) {
     auto it = obj.find(key);
     if (it != obj.end() && it->value().is_int64()) {
         return it->value().as_int64();
