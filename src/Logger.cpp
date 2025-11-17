@@ -30,6 +30,18 @@ void Logger::initialize(const std::string& levelStr, const std::string& filepath
     }
 }
 
+void Logger::log(LogLevel level, const std::string& message) {
+    if (level < currentLevel) return;
+    if (consoleOutput) {
+        std::cout << message << std::endl;
+    }
+    if (logFile.is_open()) {
+        std::string logEntry = getTimestamp() + " [" + levelToString(level) + "] " + message;
+        logFile << logEntry << std::endl;
+        logFile.flush();
+    }
+}
+
 LogLevel Logger::stringToLevel(const std::string& levelStr) {
     if (levelStr == "DEBUG") return LogLevel::DEBUG;
     if (levelStr == "INFO") return LogLevel::INFO;
@@ -40,21 +52,6 @@ LogLevel Logger::stringToLevel(const std::string& levelStr) {
 
 void Logger::setLevel(LogLevel level) {
     currentLevel = level;
-}
-
-void Logger::log(LogLevel level, const std::string& message) {
-    if (level < currentLevel) return;
-
-    std::string logEntry = getTimestamp() + " [" + levelToString(level) + "] " + message;
-
-    if (consoleOutput) {
-        std::cout << logEntry << std::endl;
-    }
-
-    if (logFile.is_open()) {
-        logFile << logEntry << std::endl;
-        logFile.flush();
-    }
 }
 
 std::string Logger::levelToString(LogLevel level) {
