@@ -1,4 +1,4 @@
-﻿# CMakeList.txt: проект CMake для xray-monitor
+# CMakeList.txt: проект CMake для xray-monitor
 cmake_minimum_required(VERSION 3.8)
 
 # Включение горячей перезагрузки для компиляторов MSVC, если поддерживается.
@@ -15,6 +15,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if(STATIC_BUILD)
     set(Boost_USE_STATIC_LIBS ON)
     set(Boost_USE_MULTITHREADED ON)
+    set(OPENSSL_USE_STATIC_LIBS ON)
+    set(OPENSSL_MSVC_STATIC_RT ON)
 endif()
 
 find_package(OpenSSL REQUIRED)

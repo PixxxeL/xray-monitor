@@ -112,7 +112,7 @@ void App::sendStartupMessages() {
     bool firstUser = true;
     for (const auto& pair : connectedUsers) {
         const auto& user = pair.second;
-        telegramMsg << "• " << user.email << " " << user.ip << " " << user.id << "\n";
+        telegramMsg << "â€¢ " << user.email << " " << user.ip << " " << user.id << "\n";
 
         if (!firstUser) {
             logMsg << ", ";
@@ -139,9 +139,9 @@ void App::sendNewConnectionMessages(const std::unordered_map<std::string, User>&
             std::stringstream logMsg;
 
             telegramMsg << "*Users have connected to the xray server:*\n\n";
-            telegramMsg << "• " << user.email << " " << user.ip << " " << user.id << " " << utils::formatTime(user.lastSeen);
+            telegramMsg << "â€¢ " << user.email << " " << user.ip << " " << user.id << " " << utils::formatTime(user.lastSeen);
 
-            logMsg << "New connection: " << user.email << "(" << user.ip << ") â " << utils::formatTime(user.lastSeen);
+            logMsg << "New connection: " << user.email << "(" << user.ip << ") at " << utils::formatTime(user.lastSeen);
 
             if (telegramBot->isEnabled()) {
                 telegramBot->sendMessage(telegramMsg.str());
