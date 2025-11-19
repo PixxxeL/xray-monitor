@@ -17,33 +17,29 @@ if(STATIC_BUILD)
     set(Boost_USE_MULTITHREADED ON)
 endif()
 
-find_package(Boost 1.83 REQUIRED COMPONENTS program_options json system)
+find_package(OpenSSL REQUIRED)
+find_package(Boost 1.83 REQUIRED COMPONENTS system program_options json log log_setup)
 
 add_executable(
     xray-monitor 
-    "src/main.cpp"  
-    "src/Config.h" 
-    "src/Config.cpp" 
-    "src/version.h" 
-    "src/Logger.h" 
-    "src/Logger.cpp" 
-    "src/App.h" 
-    "src/App.cpp" 
-    "src/utils.h" 
-    "src/utils.cpp" 
-    "src/State.h" 
-    "src/State.cpp" 
-    "src/TelegramBot.h" 
-    "src/TelegramBot.cpp" 
-    "src/XRayClient.h" 
-    "src/XRayClient.cpp"
+    "src/main.cpp" "src/version.h"
+    "src/logger.h" "src/logger.cpp"
+    "src/utils.h" "src/utils.cpp"
+    "src/Config.h" "src/Config.cpp"
+    "src/State.h" "src/State.cpp"
+    "src/App.h" "src/App.cpp"
+    "src/XRayClient.h" "src/XRayClient.cpp"
+    "src/TelegramBot.h" "src/TelegramBot.cpp"
 )
 
 target_link_libraries(xray-monitor
     PRIVATE
+    OpenSSL::SSL
+    OpenSSL::Crypto
+    Boost::system
+    Boost::log
     Boost::json
     Boost::program_options
-    Boost::system
 )
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)

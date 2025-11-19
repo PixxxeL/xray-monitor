@@ -1,18 +1,22 @@
 #include "XRayClient.h"
-#include "Logger.h"
+#include "utils.h"
+#include <boost/log/trivial.hpp>
+#include <boost/json.hpp>
 #include <cstdio>
-#include <memory>
 #include <fstream>
 #include <regex>
 
-XRayClient::XRayClient(const XRayConfig& config, State& state)
+
+namespace json = boost::json;
+
+XRayClient::XRayClient(const Config& config, State& state)
     : config(config), state(state) {
 }
 
 bool XRayClient::queryStats() {
     try {
         std::string command = "xray api statsquery --server=" + config.apiAddress + ":" + std::to_string(config.apiPort);
-        std::string output = executeCommand(command);
+        std::string output = utils::executeCommand(command);
 
         if (!output.empty()) {
             parseStatsOutput(output);
@@ -20,99 +24,111 @@ bool XRayClient::queryStats() {
         }
     }
     catch (const std::exception& e) {
-        Logger::getInstance().log(LogLevel::ERROR, "Error querying XRay stats: " + std::string(e.what()));
+        BOOST_LOG_TRIVIAL(warning) << "Error querying XRay stats: " + std::string(e.what());
     }
     return false;
 }
 
 void XRayClient::parseAccessLog() {
-    if (config.accessLogPath.empty()) {
+    if (config.accessLogPath.empty() || state.getUsers().empty()) {
+        BOOST_LOG_TRIVIAL(trace) 
+            << "No access log path `" << config.accessLogPath
+            << "` or connected users " << state.getUsers().size();
         return;
     }
-
-    std::ifstream file(config.accessLogPath);
-    if (!file.is_open()) {
-        Logger::getInstance().log(LogLevel::WARNING, "Cannot open access log: " + config.accessLogPath);
+    std::string output = "";
+    try {
+        // @TODO: move number line to options
+        std::string command = "tail -n 1000 " + config.accessLogPath;
+        output = utils::executeCommand(command);
+        if (output.empty()) {
+            BOOST_LOG_TRIVIAL(debug) << "Error reading XRay log, file empty";
+            return;
+        }
+    }
+    catch (const std::exception& e) {
+        BOOST_LOG_TRIVIAL(debug) << "Error reading XRay log: " + std::string(e.what());
         return;
     }
-
+    std::istringstream iss(output);
+    std::vector<std::string> lines;
     std::string line;
     std::regex logPattern(R"(from (\d+\.\d+\.\d+\.\d+):\d+ accepted .*? email: ([^\s]+))");
-
-    while (std::getline(file, line)) {
+    std::unordered_map<std::string, std::string> ips;
+    while (std::getline(iss, line)) {
+        lines.push_back(line);
+    }
+    for (auto it = lines.rbegin(); it != lines.rend(); ++it) {
         std::smatch matches;
-        if (std::regex_search(line, matches, logPattern) && matches.size() == 3) {
+        if (std::regex_search(*it, matches, logPattern) && matches.size() == 3) {
             std::string ip = matches[1];
             std::string email = matches[2];
-
-            // Update user IP in state
-            auto user = state.getUser(email);
-            if (!user.email.empty()) {
-                state.updateUser(email, ip, user.connected);
+            if (ips.find(email) == ips.end()) {
+                ips[email] = ip;
             }
         }
     }
-}
-
-std::string XRayClient::executeCommand(const std::string& command) const {
-    std::array<char, 128> buffer;
-    std::string result;
-
-    std::unique_ptr<FILE, int(*)(FILE*)> pipe(popen(command.c_str(), "r"), pclose);
-    if (!pipe) {
-        throw std::runtime_error("popen() failed for command: " + command);
+    for (const auto& pair : state.getUsers()) {
+        std::string email = pair.second.email;
+        if (!ips.count(email)) {
+            continue;
+        }
+        std::string ip = ips[email];
+        state.updateUser(email, ip, pair.second.connected);
     }
-
-    while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
-        result += buffer.data();
-    }
-
-    return result;
 }
 
 void XRayClient::parseStatsOutput(const std::string& output) {
-    std::istringstream iss(output);
-    std::string line;
-    std::regex statPattern(R"(\"name\":\s*\"([^\"]+)\")");
-    std::regex valuePattern(R"(\"valu\e":\s*(\d+))");
-
-    std::string currentStat;
-    uint64_t currentValue = 0;
-
-    while (std::getline(iss, line)) {
-        std::smatch matches;
-
-        if (std::regex_search(line, matches, statPattern) && matches.size() == 2) {
-            currentStat = matches[1];
-        }
-        else if (std::regex_search(line, matches, valuePattern) && matches.size() == 2) {
-            currentValue = std::stoull(matches[1]);
-
-            if (!currentStat.empty()) {
-                std::string email = extractEmailFromStatName(currentStat);
-                if (!email.empty()) {
-                    // Check if this is downlink traffic
-                    if (currentStat.find("downlink") != std::string::npos) {
-                        state.updateUser(email, "", true, currentValue);
+    json::value j;
+    try {
+        j = json::parse(output);
+    }
+    catch (const std::exception& e) {
+        BOOST_LOG_TRIVIAL(warning) << "Wrong API JSON: " << std::string(e.what());
+        return;
+    }
+    json::object root = j.as_object();
+    if (auto it = root.find("stat"); it != root.end() && it->value().is_array()) {
+        json::array statArray = it->value().as_array();
+        state.disconnectAllUsers();
+        for (auto& item : statArray) {
+            if (!item.is_object()) continue;
+            json::object obj = item.as_object();
+            if (auto nameIt = obj.find("name"); nameIt != obj.end() && nameIt->value().is_string()) {
+                std::string name = nameIt->value().as_string().c_str();
+                if (name.substr(0, 4) == "user") {
+                    std::vector<std::string> parts;
+                    size_t start = 0;
+                    size_t pos;
+                    while ((pos = name.find(">>>", start)) != std::string::npos) {
+                        parts.push_back(name.substr(start, pos - start));
+                        start = pos + 3;
                     }
-                    else if (currentStat.find("uplink") != std::string::npos) {
-                        state.updateUser(email, "", true, 0, currentValue);
+                    parts.push_back(name.substr(start));
+                    if (parts.size() >= 4) {
+                        std::string email = parts[1];
+                        std::string trafficType = parts.back();
+                        int64_t downlink = 0;
+                        int64_t uplink = 0;
+                        int64_t value = 0;
+                        if (trafficType == "downlink" || trafficType == "uplink") {
+                            if (auto valueIt = obj.find("value"); valueIt != obj.end() && valueIt->value().is_int64()) {
+                                value = valueIt->value().as_int64();
+                            }
+                        }
+                        if (trafficType == "downlink") {
+                            downlink = value;
+                        }
+                        else if (trafficType == "uplink") {
+                            uplink = value;
+                        }
+                        if (downlink || uplink) {
+                            state.updateUser(email, "", true, downlink, uplink);
+                            BOOST_LOG_TRIVIAL(trace) << "User: " << email << " " << trafficType << " = " << value;
+                        }
                     }
                 }
             }
-
-            currentStat.clear();
-            currentValue = 0;
         }
     }
-}
-
-std::string XRayClient::extractEmailFromStatName(const std::string& statName) const {
-    size_t pos1 = statName.find(">>>");
-    if (pos1 == std::string::npos) return "";
-
-    size_t pos2 = statName.find(">>>", pos1 + 3);
-    if (pos2 == std::string::npos) return "";
-
-    return statName.substr(pos1 + 3, pos2 - pos1 - 3);
 }

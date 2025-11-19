@@ -3,10 +3,17 @@
 
 #include <string>
 #include <ctime>
+#include <boost/json.hpp>
+
+
+namespace json = boost::json;
 
 namespace utils {
     std::string formatTime(time_t time);
-    std::string escapeJsonString(const std::string& input);
+    std::string toLower(const std::string& input);
+    std::string readFile(const std::string& filepath);
+    json::value parseJsonFile(const std::string& filepath);
+    std::string executeCommand(const std::string& command);
 }
 
 #endif

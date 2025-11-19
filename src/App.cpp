@@ -1,84 +1,74 @@
 #include "App.h"
-#include "Logger.h"
+#include "logger.h"
 #include "utils.h"
+#include "Config.h"
 #include <csignal>
 #include <thread>
 #include <sstream>
+#include <boost/log/trivial.hpp>
+
 
 // Static member for signal handling
 static App* g_appInstance = nullptr;
 
-App::App(const AppConfig& appConfig) : appConfig(appConfig) {
-}
+App::App(const Config& config) : config(config) {}
 
 int App::run() {
-    try {
-        initialize();
+    initialize();
 
-        bool firstIteration = true;
+    bool firstIteration = true;
 
-        // Main loop
-        while (!shutdownRequested) {
-            try {
-                // Query XRay stats
-                if (xrayClient->queryStats()) {
-                    // Parse access log for IP addresses
-                    xrayClient->parseAccessLog();
-
-                    if (firstIteration) {
-                        handleFirstIteration();
-                        firstIteration = false;
-                    }
-                    else {
-                        handleSubsequentIterations();
-                    }
+    while (!shutdownRequested) {
+        try {
+            if (xrayClient->queryStats()) {
+                // Parse access log for IP addresses
+                xrayClient->parseAccessLog();
+                if (firstIteration) {
+                    handleFirstIteration();
+                    firstIteration = false;
                 }
-
-                // Sleep for interval
-                for (int i = 0; i < appConfig.interval && !shutdownRequested; ++i) {
-                    std::this_thread::sleep_for(std::chrono::seconds(1));
+                else {
+                    handleSubsequentIterations();
                 }
-
             }
-            catch (const std::exception& e) {
-                Logger::getInstance().log(LogLevel::ERROR, "Error in main loop: " + std::string(e.what()));
+            // Sleep for interval, for feedback on SIGTERM, every second
+            for (int i = 0; i < config.interval && !shutdownRequested; ++i) {
+                std::this_thread::sleep_for(std::chrono::seconds(1));
             }
         }
-
-        // Shutdown
-        std::string completed = "Xray connection monitoring completed";
-        Logger::getInstance().log(LogLevel::INFO, completed);
-        if (telegramBot->isEnabled()) {
-            telegramBot->sendMessage(completed);
+        catch (const std::exception& e) {
+            BOOST_LOG_TRIVIAL(error) << "Error in main loop: " << std::string(e.what());
         }
-        return 0;
     }
-    catch (const std::exception& e) {
-        Logger::getInstance().log(LogLevel::ERROR, "Fatal error in App::run: " + std::string(e.what()));
-        return 1;
+
+    // Shutdown
+    std::string completed = "Xray connection monitoring completed";
+    BOOST_LOG_TRIVIAL(error) << completed;
+    if (telegramBot->isEnabled()) {
+        telegramBot->sendMessage(completed);
     }
+    return 0;
 }
 
 void App::initialize() {
-    Logger::getInstance().initialize(appConfig.logLevelStr, appConfig.logFilePath);
-    Logger::getInstance().log(LogLevel::INFO, "Starting XRay Monitor");
+    initLogging(config.logFilePath, config.logLevelStr);
+    BOOST_LOG_TRIVIAL(info) << "Starting XRay Monitor";
 
-    // Parse XRay config
-    xrayConfig = XRayConfig::parseFromFile(appConfig.xrayConfigPath);
-    xrayConfig.validate();
-
-    Logger::getInstance().log(LogLevel::INFO,
-        "XRay config loaded successfully. API endpoint: " + xrayConfig.apiAddress + ":" + std::to_string(xrayConfig.apiPort));
+    config.parseConfigFile();
+    BOOST_LOG_TRIVIAL(info)
+        << "XRay config loaded successfully. API endpoint: "
+        << config.apiAddress << ":"
+        << std::to_string(config.apiPort);
 
     // Initialize components
-    xrayClient = std::make_unique<XRayClient>(xrayConfig, state);
-    telegramBot = std::make_unique<TelegramBot>(appConfig.telegramToken, appConfig.telegramChannel);
+    xrayClient = std::make_unique<XRayClient>(config, state);
+    telegramBot = std::make_unique<TelegramBot>(config.telegramToken, config.telegramChannel);
 
     // Setup signal handlers
     setupSignalHandlers();
 
     // Initial state setup with users from config
-    for (const auto& pair : xrayConfig.users) {
+    for (const auto& pair : config.users) {
         state.updateUser(pair.first, "", false);
     }
 }
@@ -122,7 +112,7 @@ void App::sendStartupMessages() {
     bool firstUser = true;
     for (const auto& pair : connectedUsers) {
         const auto& user = pair.second;
-        telegramMsg << "â€¢ " << user.email << " " << user.ip << " " << user.id << "\n";
+        telegramMsg << "• " << user.email << " " << user.ip << " " << user.id << "\n";
 
         if (!firstUser) {
             logMsg << ", ";
@@ -135,7 +125,7 @@ void App::sendStartupMessages() {
         telegramBot->sendMessage(telegramMsg.str());
     }
 
-    Logger::getInstance().log(LogLevel::INFO, logMsg.str());
+    BOOST_LOG_TRIVIAL(info) << logMsg.str();
 }
 
 void App::sendNewConnectionMessages(const std::unordered_map<std::string, User>& connectedUsers) {
@@ -149,15 +139,15 @@ void App::sendNewConnectionMessages(const std::unordered_map<std::string, User>&
             std::stringstream logMsg;
 
             telegramMsg << "*Users have connected to the xray server:*\n\n";
-            telegramMsg << "â€¢ " << user.email << " " << user.ip << " " << user.id << " " << utils::formatTime(user.lastSeen);
+            telegramMsg << "• " << user.email << " " << user.ip << " " << user.id << " " << utils::formatTime(user.lastSeen);
 
-            logMsg << "New connection: " << user.email << "(" << user.ip << ") Ð² " << utils::formatTime(user.lastSeen);
+            logMsg << "New connection: " << user.email << "(" << user.ip << ") â " << utils::formatTime(user.lastSeen);
 
             if (telegramBot->isEnabled()) {
                 telegramBot->sendMessage(telegramMsg.str());
             }
 
-            Logger::getInstance().log(LogLevel::INFO, logMsg.str());
+            BOOST_LOG_TRIVIAL(info) << logMsg.str();
         }
     }
 }

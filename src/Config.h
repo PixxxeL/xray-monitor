@@ -6,47 +6,35 @@
 #include <unordered_map>
 #include <boost/json.hpp>
 #include <boost/program_options.hpp>
+#include "State.h"
 
-struct User {
-    std::string id;
-    std::string email;
-    std::string ip;
-    bool connected = false;
-    time_t lastSeen = 0;
-    uint64_t downlink = 0;
-    uint64_t uplink = 0;
-};
 
-struct XRayConfig {
+namespace po = boost::program_options;
+namespace json = boost::json;
+
+class Config {
+public:
+    std::string xrayConfigPath = "/usr/local/etc/xray/config.json";
+    std::string logLevelStr = "info";
+    std::string logFilePath;
+    unsigned int interval = 10;
+    std::string telegramToken;
+    std::string telegramChannel;
     std::string apiAddress = "127.0.0.1";
-    int apiPort = 0;
+    unsigned int apiPort = 0;
     std::string accessLogPath;
     std::unordered_map<std::string, User> users;
 
-    static XRayConfig parseFromFile(const std::string& filepath);
+    static Config parseCommandLine(int argc, char* argv[]);
     void validate() const;
-
-private:
-    void parseInbounds(const boost::json::object& root);
-    void parseUsers(const boost::json::object& root);
-};
-
-class AppConfig {
-public:
-    std::string xrayConfigPath = "/usr/local/etc/xray/config.json";
-    std::string logLevelStr = "INFO";
-    std::string logFilePath;
-    int interval = 10;
-    std::string telegramToken;
-    std::string telegramChannel;
-
-    static AppConfig parseCommandLine(int argc, char* argv[]);
-    void validate() const;
-    void printHelp(const boost::program_options::options_description& desc) const;
+    void printHelp(const po::options_description& desc) const;
     void printVersion() const;
+    void parseConfigFile();
 
 private:
-    static boost::program_options::options_description createOptionsDescription();
+    static po::options_description createOptionsDescription();
+    void parseInbounds(const json::object& root);
+    void parseUsers(const json::object& root);
 };
 
 #endif

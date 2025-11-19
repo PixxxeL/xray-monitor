@@ -1,78 +1,49 @@
-#include "Logger.h"
-#include <iostream>
-#include <chrono>
-#include <iomanip>
+#include <boost/log/trivial.hpp>
+#include <boost/log/support/date_time.hpp>
+#include <boost/log/utility/setup/file.hpp>
+#include <boost/log/utility/setup/console.hpp>
+#include <boost/log/utility/setup/common_attributes.hpp>
+#include <boost/log/expressions.hpp>
+#include <boost/dll/runtime_symbol_info.hpp>
+#include "logger.h"
 
-Logger& Logger::getInstance() {
-    static Logger instance;
-    return instance;
+
+namespace logging = boost::log;
+namespace keywords = boost::log::keywords;
+namespace expr = boost::log::expressions;
+namespace fs = boost::dll::fs;
+
+static logging::trivial::severity_level stringToSeverity(const std::string& levelStr) {
+    if (levelStr == "trace") return logging::trivial::trace;
+    if (levelStr == "debug") return logging::trivial::debug;
+    if (levelStr == "info") return logging::trivial::info;
+    if (levelStr == "warning") return logging::trivial::warning;
+    if (levelStr == "error") return logging::trivial::error;
+    if (levelStr == "fatal") return logging::trivial::fatal;
+    return logging::trivial::info;
 }
 
-Logger::~Logger() {
-    if (logFile.is_open()) {
-        logFile.close();
+void initLogging(const std::string fileName, const std::string level) {
+    // to console
+    auto consoleHandler = logging::add_console_log();
+    logging::trivial::severity_level levelSeverity = stringToSeverity(level);
+    consoleHandler->set_filter(logging::trivial::severity >= levelSeverity);
+    // to file
+    if (fileName != "") {
+        fs::path exePath = boost::dll::program_location();
+        boost::filesystem::path filePath = exePath / fileName;
+        auto fileHandler = logging::add_file_log(
+            keywords::file_name = filePath.string(),
+            keywords::rotation_size = 10 * 1024 * 1024,
+            keywords::max_size = 50 * 1024 * 1024,
+            keywords::format = (
+                expr::stream
+                << expr::format_date_time< boost::posix_time::ptime >("TimeStamp", "%Y-%m-%d %H:%M:%S")
+                << " [" << logging::trivial::severity
+                << "] " << expr::smessage
+                )
+        );
+        fileHandler->set_filter(logging::trivial::severity >= levelSeverity);
     }
-}
-
-void Logger::initialize(const std::string& levelStr, const std::string& filepath) {
-    currentLevel = stringToLevel(levelStr);
-
-    if (!filepath.empty()) {
-        logFile.open(filepath, std::ios::app);
-        if (!logFile.is_open()) {
-            throw std::runtime_error("Cannot open log file: " + filepath);
-        }
-        logFilePath = filepath;
-        consoleOutput = false;
-    }
-    else {
-        consoleOutput = true;
-    }
-}
-
-void Logger::log(LogLevel level, const std::string& message) {
-    if (level < currentLevel) return;
-    if (consoleOutput) {
-        std::cout << message << std::endl;
-    }
-    if (logFile.is_open()) {
-        std::string logEntry = getTimestamp() + " [" + levelToString(level) + "] " + message;
-        logFile << logEntry << std::endl;
-        logFile.flush();
-    }
-}
-
-LogLevel Logger::stringToLevel(const std::string& levelStr) {
-    if (levelStr == "DEBUG") return LogLevel::DEBUG;
-    if (levelStr == "INFO") return LogLevel::INFO;
-    if (levelStr == "WARNING") return LogLevel::WARNING;
-    if (levelStr == "ERROR") return LogLevel::ERROR;
-    throw std::runtime_error("Unknown log level: " + levelStr);
-}
-
-void Logger::setLevel(LogLevel level) {
-    currentLevel = level;
-}
-
-std::string Logger::levelToString(LogLevel level) {
-    switch (level) {
-    case LogLevel::DEBUG: return "DEBUG";
-    case LogLevel::INFO: return "INFO";
-    case LogLevel::WARNING: return "WARNING";
-    case LogLevel::ERROR: return "ERROR";
-    default: return "UNKNOWN";
-    }
-}
-
-std::string Logger::getTimestamp() {
-    auto now = std::chrono::system_clock::now();
-    auto time_t = std::chrono::system_clock::to_time_t(now);
-    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-        now.time_since_epoch()) % 1000;
-
-    std::stringstream ss;
-    ss << std::put_time(std::localtime(&time_t), "%Y-%m-%d %H:%M:%S");
-    ss << "." << std::setfill('0') << std::setw(3) << ms.count();
-
-    return ss.str();
+    logging::add_common_attributes();
 }

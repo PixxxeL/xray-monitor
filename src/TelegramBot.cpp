@@ -1,40 +1,47 @@
 #include "TelegramBot.h"
-#include "Logger.h"
-#include <boost/asio/connect.hpp>
+#include <openssl/ssl.h>
+//#include <boost/asio/connect.hpp>
 #include <boost/asio/ip/tcp.hpp>
-#include <boost/beast/core.hpp>
+//#include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/version.hpp>
+#include <boost/beast/ssl.hpp>
+//#include <boost/asio/ssl.hpp>
+#include <boost/log/trivial.hpp>
+
+//#include <iostream>
 
 namespace beast = boost::beast;
 namespace http = beast::http;
 namespace net = boost::asio;
+namespace ssl = net::ssl;
 using tcp = net::ip::tcp;
 
-TelegramBot::TelegramBot(const std::string& token, const std::string& channel)
-    : token(token), channel(channel) {
-}
 
-TelegramBot::~TelegramBot() {
-}
+TelegramBot::TelegramBot(const std::string& token, const std::string& channel) : token(token), channel(channel) {}
 
 bool TelegramBot::sendMessage(const std::string& message) {
     if (!isEnabled()) {
-        Logger::getInstance().log(LogLevel::WARNING, "Telegram bot not configured, message not sent");
+        BOOST_LOG_TRIVIAL(warning) << "Telegram bot not configured, message not sent";
         return false;
     }
 
     try {
         net::io_context ioc;
         tcp::resolver resolver(ioc);
-        tcp::socket socket(ioc);
+        ssl::context ctx{ ssl::context::tlsv12_client }; // or tls v1.3
+        ssl::stream<tcp::socket> ssl_stream(ioc, ctx);
 
         auto const results = resolver.resolve("api.telegram.org", "443");
+        net::connect(ssl_stream.next_layer(), results);
 
-        // For simplicity, we'll use HTTP here. In production, consider using HTTPS
-        beast::tcp_stream stream(ioc);
-        stream.connect(results);
+        // Set SNI hostname
+        SSL_set_tlsext_host_name(ssl_stream.native_handle(), "api.telegram.org");
 
+        // Make SSL handshake
+        ssl_stream.handshake(ssl::stream_base::client);
+
+        // @TODO: replace with 3-side solution
         std::string escapedMessage = escapeMessage(message);
         std::string requestBody = "chat_id=" + channel + "&text=" + escapedMessage + "&parse_mode=Markdown";
 
@@ -45,26 +52,34 @@ bool TelegramBot::sendMessage(const std::string& message) {
         req.set(http::field::content_length, std::to_string(requestBody.length()));
         req.body() = requestBody;
 
-        http::write(stream, req);
+        http::write(ssl_stream, req);
 
         beast::flat_buffer buffer;
         http::response<http::string_body> res;
-        http::read(stream, buffer, res);
+        http::read(ssl_stream, buffer, res);
 
-        stream.socket().shutdown(tcp::socket::shutdown_both);
+        boost::system::error_code ec;
+        ssl_stream.shutdown(ec);
+        if (ec && ec != boost::asio::ssl::error::stream_truncated) {
+            throw boost::system::system_error(ec);
+        }
 
         if (res.result() == http::status::ok) {
-            Logger::getInstance().log(LogLevel::DEBUG, "Telegram message sent successfully");
+            BOOST_LOG_TRIVIAL(debug) << "Telegram message sent successfully";
             return true;
         }
         else {
-            Logger::getInstance().log(LogLevel::ERROR,
-                "Failed to send Telegram message: " + std::to_string(res.result_int()) + " " + std::string(res.reason()));
+            BOOST_LOG_TRIVIAL(error)
+                << "Failed to send Telegram message: "
+                << std::to_string(res.result_int())
+                << " " << std::string(res.reason());
             return false;
         }
     }
     catch (const std::exception& e) {
-        Logger::getInstance().log(LogLevel::ERROR, "Error sending Telegram message: " + std::string(e.what()));
+        BOOST_LOG_TRIVIAL(error)
+            << "Error sending Telegram message: "
+            << std::string(e.what());
         return false;
     }
 }

@@ -1,10 +1,20 @@
 #ifndef STATE_H
 #define STATE_H
 
-#include "Config.h"
 #include <unordered_map>
-#include <mutex>
-#include <atomic>
+#include <string>
+#include <cstdint>
+
+
+struct User {
+    std::string id;
+    std::string email;
+    std::string ip;
+    bool connected = false;
+    time_t lastSeen = 0;
+    uint64_t downlink = 0;
+    uint64_t uplink = 0;
+};
 
 class State {
 public:
@@ -16,14 +26,14 @@ public:
     std::unordered_map<std::string, User> getUsers() const;
     std::unordered_map<std::string, User> getConnectedUsers() const;
     std::unordered_map<std::string, User> getDisconnectedUsers() const;
+    void disconnectAllUsers();
 
     void setRunning(bool running) { isRunning = running; }
     bool getRunning() const { return isRunning; }
 
 private:
-    mutable std::mutex mutex;
     std::unordered_map<std::string, User> users;
-    std::atomic<bool> isRunning{ true };
+    bool isRunning{ true };
 };
 
 #endif

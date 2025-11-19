@@ -7,17 +7,17 @@
 #include "TelegramBot.h"
 #include <atomic>
 
+
 class App {
 public:
-    App(const AppConfig& appConfig);
+    App(const Config& config);
     ~App() = default;
 
     int run();
     void stop();
 
 private:
-    AppConfig appConfig;
-    XRayConfig xrayConfig;
+    Config config;
     State state;
     std::unique_ptr<XRayClient> xrayClient;
     std::unique_ptr<TelegramBot> telegramBot;

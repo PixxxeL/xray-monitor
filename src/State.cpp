@@ -1,9 +1,8 @@
 #include "State.h"
 #include <chrono>
 
-void State::updateUser(const std::string& email, const std::string& ip, bool connected, uint64_t downlink, uint64_t uplink) {
-    std::lock_guard<std::mutex> lock(mutex);
 
+void State::updateUser(const std::string& email, const std::string& ip, bool connected, uint64_t downlink, uint64_t uplink) {
     auto it = users.find(email);
     if (it != users.end()) {
         it->second.connected = connected;
@@ -13,6 +12,7 @@ void State::updateUser(const std::string& email, const std::string& ip, bool con
         }
         if (downlink > 0) it->second.downlink = downlink;
         if (uplink > 0) it->second.uplink = uplink;
+        // @TODO: Update lastSeen too?
     }
     else {
         User user;
@@ -27,12 +27,10 @@ void State::updateUser(const std::string& email, const std::string& ip, bool con
 }
 
 void State::removeUser(const std::string& email) {
-    std::lock_guard<std::mutex> lock(mutex);
     users.erase(email);
 }
 
 User State::getUser(const std::string& email) const {
-    std::lock_guard<std::mutex> lock(mutex);
     auto it = users.find(email);
     if (it != users.end()) {
         return it->second;
@@ -41,12 +39,10 @@ User State::getUser(const std::string& email) const {
 }
 
 std::unordered_map<std::string, User> State::getUsers() const {
-    std::lock_guard<std::mutex> lock(mutex);
     return users;
 }
 
 std::unordered_map<std::string, User> State::getConnectedUsers() const {
-    std::lock_guard<std::mutex> lock(mutex);
     std::unordered_map<std::string, User> connected;
     for (const auto& pair : users) {
         if (pair.second.connected) {
@@ -57,7 +53,6 @@ std::unordered_map<std::string, User> State::getConnectedUsers() const {
 }
 
 std::unordered_map<std::string, User> State::getDisconnectedUsers() const {
-    std::lock_guard<std::mutex> lock(mutex);
     std::unordered_map<std::string, User> disconnected;
     for (const auto& pair : users) {
         if (!pair.second.connected) {
@@ -65,4 +60,10 @@ std::unordered_map<std::string, User> State::getDisconnectedUsers() const {
         }
     }
     return disconnected;
+}
+
+void State::disconnectAllUsers() {
+    for (auto& [email, user] : users) {
+        user.connected = false;
+    }
 }

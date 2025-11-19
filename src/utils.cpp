@@ -1,6 +1,12 @@
 #include "utils.h"
 #include <iomanip>
 #include <sstream>
+#include <algorithm>
+#include <fstream>
+#include <memory>
+
+
+namespace json = boost::json;
 
 std::string utils::formatTime(time_t time) {
     std::tm* tm = std::localtime(&time);
@@ -9,19 +15,49 @@ std::string utils::formatTime(time_t time) {
     return ss.str();
 }
 
-std::string utils::escapeJsonString(const std::string& input) {
-    std::string output;
-    for (char c : input) {
-        switch (c) {
-        case '"': output += "\\\""; break;
-        case '\\': output += "\\\\"; break;
-        case '\b': output += "\\b"; break;
-        case '\f': output += "\\f"; break;
-        case '\n': output += "\\n"; break;
-        case '\r': output += "\\r"; break;
-        case '\t': output += "\\t"; break;
-        default: output += c; break;
-        }
+std::string utils::toLower(const std::string& input) {
+    std::string result = input;
+    std::transform(result.begin(), result.end(), result.begin(), [](unsigned char c) {
+        return std::tolower(c);
+    });
+    return result;
+}
+
+std::string utils::readFile(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        throw std::runtime_error("Cannot open file " + filepath);
     }
-    return output;
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string content = buffer.str();
+    if (content.empty()) {
+        throw std::runtime_error("File " + filepath + " is empty");
+    }
+    return content;
+}
+
+json::value utils::parseJsonFile(const std::string& filepath) {
+    try {
+        return json::parse(utils::readFile(filepath));
+    }
+    catch (const std::exception& e) {
+        throw std::runtime_error("Failed to parse JSON " + filepath + ": " + std::string(e.what()));
+    }
+}
+
+std::string utils::executeCommand(const std::string& command) {
+    std::array<char, 128> buffer;
+    std::string result;
+
+    std::unique_ptr<FILE, int(*)(FILE*)> pipe(popen(command.c_str(), "r"), pclose);
+    if (!pipe) {
+        throw std::runtime_error("popen() failed for command: " + command);
+    }
+
+    while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
+        result += buffer.data();
+    }
+
+    return result;
 }
