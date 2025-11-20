@@ -15,6 +15,7 @@ namespace utils {
     json::value parseJsonFile(const std::string& filepath);
     std::string executeCommand(const std::string& command);
     void ensurePathExists(const std::string& filePath);
+    std::string escapeMDv2(const std::string& text);
 }
 
 #endif

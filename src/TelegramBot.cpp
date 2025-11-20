@@ -7,7 +7,6 @@
 #include <boost/log/trivial.hpp>
 #include <boost/json.hpp>
 
-//#include <iostream>
 
 namespace beast = boost::beast;
 namespace http = beast::http;

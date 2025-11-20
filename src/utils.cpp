@@ -71,3 +71,16 @@ void utils::ensurePathExists(const std::string& filePath) {
         fs::create_directories(dir);
     }
 }
+
+std::string utils::escapeMDv2(const std::string& text) {
+    static const std::string chars_to_escape = R"(_*[]()~`>#+-=|{}.!)";
+    std::string result;
+    result.reserve(text.length() * 2);
+    for (char c : text) {
+        if (chars_to_escape.find(c) != std::string::npos) {
+            result += '\\';
+        }
+        result += c;
+    }
+    return result;
+}

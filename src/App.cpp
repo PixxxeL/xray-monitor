@@ -42,7 +42,7 @@ int App::run() {
     }
 
     // Shutdown
-    std::string completed = "Xray connection monitoring completed";
+    std::string completed = "🏁 Xray connection monitoring completed";
     BOOST_LOG_TRIVIAL(error) << completed;
     if (telegramBot->isEnabled()) {
         telegramBot->sendMessage(completed);
@@ -96,7 +96,7 @@ void App::sendStartupMessage() {
     std::stringstream telegramMsg;
     std::stringstream logMsg;
 
-    telegramMsg << "*Xray connection monitoring has been launched*\n\n";
+    telegramMsg << "🚀 *Xray connection monitoring has been launched*\n\n";
     if (connectedUsers.empty()) {
         telegramMsg << "No users are connected to the server.";
         logMsg << "No users are connected to the server";
@@ -109,7 +109,10 @@ void App::sendStartupMessage() {
     bool firstUser = true;
     for (const auto& pair : connectedUsers) {
         const auto& user = pair.second;
-        telegramMsg << "* " << user.email << " " << user.ip << " " << user.id << "\n";
+        telegramMsg << "  \\- "
+            << utils::escapeMDv2(user.email) << " "
+            << utils::escapeMDv2(user.ip) << " "
+            << utils::escapeMDv2(user.id) << "\n";
         if (!firstUser) {
             logMsg << ", ";
         }
@@ -135,10 +138,17 @@ void App::sendNewConnectionMessage() {
             std::stringstream telegramMsg;
             std::stringstream logMsg;
 
-            telegramMsg << "*Users have connected to the xray server:*\n";
-            telegramMsg << "* " << user.email << " " << user.ip << " " << user.id << " " << utils::formatTime(user.lastSeen);
+            telegramMsg << "*Users have connected to the xray server:*\n\n";
+            telegramMsg << "  \\- "
+                << utils::escapeMDv2(user.email) << " "
+                << utils::escapeMDv2(user.ip) << " "
+                << utils::escapeMDv2(user.id) << " "
+                << utils::escapeMDv2(utils::formatTime(user.lastSeen));
 
-            logMsg << "New connection: " << user.email << "(" << user.ip << ") at " << utils::formatTime(user.lastSeen);
+            logMsg << "New connection: "
+                << user.email
+                << "(" << user.ip << ") "
+                << utils::formatTime(user.lastSeen);
 
             if (telegramBot->isEnabled()) {
                 telegramBot->sendMessage(telegramMsg.str());

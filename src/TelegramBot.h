@@ -16,8 +16,6 @@ private:
     std::string token;
     std::string channel;
     boost::asio::io_service ioService;
-
-    std::string escapeMessage(const std::string& text) const;
 };
 
 #endif
