@@ -24,11 +24,11 @@ int App::run() {
                 // Parse access log for IP addresses
                 xrayClient->parseAccessLog();
                 if (firstIteration) {
-                    handleFirstIteration();
+                    sendStartupMessage();
                     firstIteration = false;
                 }
                 else {
-                    handleSubsequentIterations();
+                    sendNewConnectionMessage();
                 }
             }
             // Sleep for interval, for feedback on SIGTERM, every second
@@ -68,6 +68,7 @@ void App::initialize() {
     setupSignalHandlers();
 
     // Initial state setup with users from config
+    // @TODO: Unnecessary (already init in config.parseConfigFile) calls - check!
     for (const auto& pair : config.users) {
         state.updateUser(pair.first, "", false);
     }
@@ -89,35 +90,30 @@ void App::signalHandler(int signal) {
     }
 }
 
-void App::handleFirstIteration() {
-    sendStartupMessages();
-}
-
-void App::handleSubsequentIterations() {
-    auto connectedUsers = state.getConnectedUsers();
-    sendNewConnectionMessages(connectedUsers);
-}
-
-void App::sendStartupMessages() {
+void App::sendStartupMessage() {
     auto connectedUsers = state.getConnectedUsers();
 
     std::stringstream telegramMsg;
     std::stringstream logMsg;
 
     telegramMsg << "*Xray connection monitoring has been launched*\n\n";
-    telegramMsg << "Users are connected to the server:\n";
-
-    logMsg << "Xray connection monitoring has been launched. Connected users: ";
+    if (connectedUsers.empty()) {
+        telegramMsg << "No users are connected to the server.";
+        logMsg << "No users are connected to the server";
+    }
+    else {
+        telegramMsg << "Users are already connected to the server:\n";
+        logMsg << "Xray connection monitoring has been launched. Connected users: ";
+    }
 
     bool firstUser = true;
     for (const auto& pair : connectedUsers) {
         const auto& user = pair.second;
-        telegramMsg << "• " << user.email << " " << user.ip << " " << user.id << "\n";
-
+        telegramMsg << "* " << user.email << " " << user.ip << " " << user.id << "\n";
         if (!firstUser) {
             logMsg << ", ";
         }
-        logMsg << user.email << "(" << user.ip << ")";
+        logMsg << user.email;
         firstUser = false;
     }
 
@@ -128,18 +124,19 @@ void App::sendStartupMessages() {
     BOOST_LOG_TRIVIAL(info) << logMsg.str();
 }
 
-void App::sendNewConnectionMessages(const std::unordered_map<std::string, User>& connectedUsers) {
+void App::sendNewConnectionMessage() {
+    auto connectedUsers = state.getConnectedUsers();
     for (const auto& pair : connectedUsers) {
         const auto& user = pair.second;
         auto previousUser = state.getUser(user.email);
-
+        // @TODO: need another checkin!
         if (!previousUser.connected) {
             // New connection
             std::stringstream telegramMsg;
             std::stringstream logMsg;
 
-            telegramMsg << "*Users have connected to the xray server:*\n\n";
-            telegramMsg << "• " << user.email << " " << user.ip << " " << user.id << " " << utils::formatTime(user.lastSeen);
+            telegramMsg << "*Users have connected to the xray server:*\n";
+            telegramMsg << "* " << user.email << " " << user.ip << " " << user.id << " " << utils::formatTime(user.lastSeen);
 
             logMsg << "New connection: " << user.email << "(" << user.ip << ") at " << utils::formatTime(user.lastSeen);
 

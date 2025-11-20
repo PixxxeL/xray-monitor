@@ -1,13 +1,11 @@
 #include "TelegramBot.h"
 #include <openssl/ssl.h>
-//#include <boost/asio/connect.hpp>
 #include <boost/asio/ip/tcp.hpp>
-//#include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/version.hpp>
 #include <boost/beast/ssl.hpp>
-//#include <boost/asio/ssl.hpp>
 #include <boost/log/trivial.hpp>
+#include <boost/json.hpp>
 
 //#include <iostream>
 
@@ -41,16 +39,23 @@ bool TelegramBot::sendMessage(const std::string& message) {
         // Make SSL handshake
         ssl_stream.handshake(ssl::stream_base::client);
 
-        // @TODO: replace with 3-side solution
-        std::string escapedMessage = escapeMessage(message);
-        std::string requestBody = "chat_id=" + channel + "&text=" + escapedMessage + "&parse_mode=Markdown";
+        boost::json::object jsonBody{
+            {"chat_id", channel},
+            {"text", message},
+            {"parse_mode", "MarkdownV2"}
+        };
+        std::string jsonStr = boost::json::serialize(jsonBody);
 
-        http::request<http::string_body> req{ http::verb::post, "/bot" + token + "/sendMessage", 11 };
+        http::request<http::string_body> req{
+            http::verb::post,
+            "/bot" + token + "/sendMessage",
+            11
+        };
         req.set(http::field::host, "api.telegram.org");
         req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
-        req.set(http::field::content_type, "application/x-www-form-urlencoded");
-        req.set(http::field::content_length, std::to_string(requestBody.length()));
-        req.body() = requestBody;
+        req.set(http::field::content_type, "application/json");
+        req.set(http::field::content_length, std::to_string(jsonStr.size()));
+        req.body() = jsonStr;
 
         http::write(ssl_stream, req);
 
@@ -82,21 +87,4 @@ bool TelegramBot::sendMessage(const std::string& message) {
             << std::string(e.what());
         return false;
     }
-}
-
-std::string TelegramBot::escapeMessage(const std::string& text) const {
-    std::string result;
-    for (char c : text) {
-        switch (c) {
-        case '_': case '*': case '[': case ']': case '(': case ')':
-        case '~': case '`': case '>': case '#': case '+': case '-':
-        case '=': case '|': case '{': case '}': case '.': case '!':
-            result += '\\';
-            result += c;
-            break;
-        default:
-            result += c;
-        }
-    }
-    return result;
 }

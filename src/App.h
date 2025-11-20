@@ -25,10 +25,8 @@ private:
 
     void initialize();
     void setupSignalHandlers();
-    void handleFirstIteration();
-    void handleSubsequentIterations();
-    void sendStartupMessages();
-    void sendNewConnectionMessages(const std::unordered_map<std::string, User>& connectedUsers);
+    void sendStartupMessage();
+    void sendNewConnectionMessage();
     static void signalHandler(int signal);
 };
 

@@ -4,9 +4,11 @@
 #include <algorithm>
 #include <fstream>
 #include <memory>
+#include <boost/filesystem.hpp>
 
 
 namespace json = boost::json;
+namespace fs = boost::filesystem;
 
 std::string utils::formatTime(time_t time) {
     std::tm* tm = std::localtime(&time);
@@ -60,4 +62,12 @@ std::string utils::executeCommand(const std::string& command) {
     }
 
     return result;
+}
+
+void utils::ensurePathExists(const std::string& filePath) {
+    fs::path path(filePath);
+    fs::path dir = path.parent_path();
+    if (!dir.empty() && !fs::exists(dir)) {
+        fs::create_directories(dir);
+    }
 }

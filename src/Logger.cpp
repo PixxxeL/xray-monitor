@@ -6,12 +6,12 @@
 #include <boost/log/expressions.hpp>
 #include <boost/dll/runtime_symbol_info.hpp>
 #include "logger.h"
+#include "utils.h"
 
 
 namespace logging = boost::log;
 namespace keywords = boost::log::keywords;
 namespace expr = boost::log::expressions;
-namespace fs = boost::dll::fs;
 
 static logging::trivial::severity_level stringToSeverity(const std::string& levelStr) {
     if (levelStr == "trace") return logging::trivial::trace;
@@ -23,17 +23,16 @@ static logging::trivial::severity_level stringToSeverity(const std::string& leve
     return logging::trivial::info;
 }
 
-void initLogging(const std::string fileName, const std::string level) {
+void initLogging(const std::string filePath, const std::string level) {
     // to console
     auto consoleHandler = logging::add_console_log();
     logging::trivial::severity_level levelSeverity = stringToSeverity(level);
     consoleHandler->set_filter(logging::trivial::severity >= levelSeverity);
     // to file
-    if (fileName != "") {
-        fs::path exePath = boost::dll::program_location();
-        boost::filesystem::path filePath = exePath / fileName;
+    if (filePath != "") {
+        utils::ensurePathExists(filePath);
         auto fileHandler = logging::add_file_log(
-            keywords::file_name = filePath.string(),
+            keywords::file_name = filePath,
             keywords::rotation_size = 10 * 1024 * 1024,
             keywords::max_size = 50 * 1024 * 1024,
             keywords::format = (

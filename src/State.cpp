@@ -4,22 +4,22 @@
 
 void State::updateUser(const std::string& email, const std::string& ip, bool connected, uint64_t downlink, uint64_t uplink) {
     auto it = users.find(email);
+    auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     if (it != users.end()) {
         it->second.connected = connected;
-        it->second.lastSeen = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+        it->second.lastSeen = now;
         if (!ip.empty()) {
             it->second.ip = ip;
         }
         if (downlink > 0) it->second.downlink = downlink;
         if (uplink > 0) it->second.uplink = uplink;
-        // @TODO: Update lastSeen too?
     }
     else {
         User user;
         user.email = email;
         user.ip = ip;
         user.connected = connected;
-        user.lastSeen = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+        user.lastSeen = now;
         user.downlink = downlink;
         user.uplink = uplink;
         users[email] = user;
