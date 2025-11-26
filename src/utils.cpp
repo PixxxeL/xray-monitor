@@ -84,3 +84,14 @@ std::string utils::escapeMDv2(const std::string& text) {
     }
     return result;
 }
+
+std::time_t utils::parseDate(const std::string datetime, const std::string format) {
+    std::tm tm = {};
+    std::istringstream ss(datetime);
+    ss >> std::get_time(&tm, format.c_str());
+    if (ss.fail()) {
+        return 0;
+    }
+    // as local time
+    return std::mktime(&tm);
+}

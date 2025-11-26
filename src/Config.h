@@ -6,8 +6,12 @@
 #include <unordered_map>
 #include <boost/json.hpp>
 #include <boost/program_options.hpp>
-#include "State.h"
 
+
+struct User {
+    std::string id;
+    std::string email;
+};
 
 namespace po = boost::program_options;
 namespace json = boost::json;

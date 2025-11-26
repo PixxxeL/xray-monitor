@@ -20,16 +20,15 @@ int App::run() {
 
     while (!shutdownRequested) {
         try {
-            if (xrayClient->queryStats()) {
-                // Parse access log for IP addresses
-                xrayClient->parseAccessLog();
-                if (firstIteration) {
-                    sendStartupMessage();
-                    firstIteration = false;
-                }
-                else {
-                    sendNewConnectionMessage();
-                }
+            // Parse access log for IP addresses
+            xrayClient->processAccessLog();
+            if (firstIteration) {
+                sendStartupMessage();
+                firstIteration = false;
+            }
+            else {
+                sendNewConnectionMessage();
+                sendDisconnectionMessage();
             }
             // Sleep for interval, for feedback on SIGTERM, every second
             for (int i = 0; i < config.interval && !shutdownRequested; ++i) {
@@ -61,17 +60,11 @@ void App::initialize() {
         << std::to_string(config.apiPort);
 
     // Initialize components
-    xrayClient = std::make_unique<XRayClient>(config, state);
+    xrayClient = std::make_unique<XRayClient>(config);
     telegramBot = std::make_unique<TelegramBot>(config.telegramToken, config.telegramChannel);
 
     // Setup signal handlers
     setupSignalHandlers();
-
-    // Initial state setup with users from config
-    // @TODO: Unnecessary (already init in config.parseConfigFile) calls - check!
-    for (const auto& pair : config.users) {
-        state.updateUser(pair.first, "", false);
-    }
 }
 
 void App::setupSignalHandlers() {
@@ -91,28 +84,29 @@ void App::signalHandler(int signal) {
 }
 
 void App::sendStartupMessage() {
-    auto connectedUsers = state.getConnectedUsers();
+    auto users = xrayClient->getConnected();
 
     std::stringstream telegramMsg;
     std::stringstream logMsg;
 
     telegramMsg << "🚀 *Xray connection monitoring has been launched*\n\n";
-    if (connectedUsers.empty()) {
+    if (users.empty()) {
         telegramMsg << "No users are connected to the server.";
         logMsg << "No users are connected to the server";
     }
     else {
         telegramMsg << "Users are already connected to the server:\n";
+        telegramMsg << "| email | ID | IP | time |\n";
+        telegramMsg << "| --- | --- | --- | --- |\n";
         logMsg << "Xray connection monitoring has been launched. Connected users: ";
     }
 
     bool firstUser = true;
-    for (const auto& pair : connectedUsers) {
-        const auto& user = pair.second;
-        telegramMsg << "  \\- "
-            << utils::escapeMDv2(user.email) << " "
-            << utils::escapeMDv2(user.ip) << " "
-            << utils::escapeMDv2(user.id) << "\n";
+    for (const auto& user : users) {
+        telegramMsg << "| "
+            << utils::escapeMDv2(user.email) << " | "
+            << utils::escapeMDv2(user.id) << " | "
+            << utils::escapeMDv2(user.ip) << " |\n";
         if (!firstUser) {
             logMsg << ", ";
         }
@@ -128,33 +122,57 @@ void App::sendStartupMessage() {
 }
 
 void App::sendNewConnectionMessage() {
-    auto connectedUsers = state.getConnectedUsers();
-    for (const auto& pair : connectedUsers) {
-        const auto& user = pair.second;
-        auto previousUser = state.getUser(user.email);
-        // @TODO: need another checkin!
-        if (!previousUser.connected) {
-            // New connection
-            std::stringstream telegramMsg;
-            std::stringstream logMsg;
+    auto users = xrayClient->getConnected();
+    std::stringstream telegramMsg;
+    std::stringstream logMsg;
+    telegramMsg << "🔗 *Users have connected to the xray server:*\n";
+    telegramMsg << "| email | ID | IP | time |\n";
+    telegramMsg << "| --- | --- | --- | --- |\n";
+    for (const auto& user : users) {
+        telegramMsg << "| "
+            << utils::escapeMDv2(user.email) << " | "
+            << utils::escapeMDv2(user.id) << " | "
+            << utils::escapeMDv2(user.ip) << " | "
+            << utils::escapeMDv2(utils::formatTime(user.lastTime))
+            << " |\n";
 
-            telegramMsg << "*Users have connected to the xray server:*\n\n";
-            telegramMsg << "  \\- "
-                << utils::escapeMDv2(user.email) << " "
-                << utils::escapeMDv2(user.ip) << " "
-                << utils::escapeMDv2(user.id) << " "
-                << utils::escapeMDv2(utils::formatTime(user.lastSeen));
+        logMsg << "New connection: "
+            << user.email
+            << " (" << user.ip << ") "
+            << utils::formatTime(user.lastTime);
 
-            logMsg << "New connection: "
-                << user.email
-                << "(" << user.ip << ") "
-                << utils::formatTime(user.lastSeen);
-
-            if (telegramBot->isEnabled()) {
-                telegramBot->sendMessage(telegramMsg.str());
-            }
-
-            BOOST_LOG_TRIVIAL(info) << logMsg.str();
+    }
+    if (!users.empty()) {
+        if (telegramBot->isEnabled()) {
+            telegramBot->sendMessage(telegramMsg.str());
         }
+        BOOST_LOG_TRIVIAL(info) << logMsg.str();
+    }
+}
+
+void App::sendDisconnectionMessage() {
+    auto users = xrayClient->getDisconnected();
+    std::stringstream telegramMsg;
+    std::stringstream logMsg;
+    telegramMsg << "❌ *Users have disconnected from the xray server:*\n";
+    telegramMsg << "| email | ID | IP |\n";
+    telegramMsg << "| --- | --- | --- |\n";
+    for (const auto& user : users) {
+        telegramMsg << "| "
+            << utils::escapeMDv2(user.email) << " | "
+            << utils::escapeMDv2(user.id) << " | "
+            << utils::escapeMDv2(user.ip) << " |\n";
+
+        logMsg << "Discconnection: "
+            << user.email
+            << " (" << user.ip << ") "
+            << utils::formatTime(user.lastTime);
+
+    }
+    if (!users.empty()) {
+        if (telegramBot->isEnabled()) {
+            telegramBot->sendMessage(telegramMsg.str());
+        }
+        BOOST_LOG_TRIVIAL(info) << logMsg.str();
     }
 }

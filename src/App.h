@@ -2,7 +2,6 @@
 #define APP_H
 
 #include "Config.h"
-#include "State.h"
 #include "XRayClient.h"
 #include "TelegramBot.h"
 #include <atomic>
@@ -18,7 +17,6 @@ public:
 
 private:
     Config config;
-    State state;
     std::unique_ptr<XRayClient> xrayClient;
     std::unique_ptr<TelegramBot> telegramBot;
     std::atomic<bool> shutdownRequested{ false };
@@ -27,6 +25,7 @@ private:
     void setupSignalHandlers();
     void sendStartupMessage();
     void sendNewConnectionMessage();
+    void sendDisconnectionMessage();
     static void signalHandler(int signal);
 };
 

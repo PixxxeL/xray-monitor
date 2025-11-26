@@ -28,10 +28,9 @@ add_executable(
     "src/logger.h" "src/logger.cpp"
     "src/utils.h" "src/utils.cpp"
     "src/Config.h" "src/Config.cpp"
-    "src/State.h" "src/State.cpp"
     "src/App.h" "src/App.cpp"
-    "src/XRayClient.h" "src/XRayClient.cpp"
     "src/TelegramBot.h" "src/TelegramBot.cpp"
+    "src/XRayClient.h" "src/XRayClient.cpp"
 )
 
 target_link_libraries(xray-monitor

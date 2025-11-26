@@ -16,6 +16,10 @@ namespace utils {
     std::string executeCommand(const std::string& command);
     void ensurePathExists(const std::string& filePath);
     std::string escapeMDv2(const std::string& text);
+    std::time_t parseDate(
+        const std::string datetime,
+        const std::string format="%Y/%m/%d %H:%M:%S"
+    );
 }
 
 #endif

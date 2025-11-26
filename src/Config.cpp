@@ -29,11 +29,6 @@ get_optional_int64(const json::object& obj, const char* key) {
     return std::nullopt;
 }
 
-//Config& Config::getInstance() {
-//    static Config instance;
-//    return instance;
-//}
-
 Config Config::parseCommandLine(int argc, char* argv[]) {
     Config config;
     po::options_description desc = createOptionsDescription();
@@ -158,6 +153,9 @@ void Config::parseConfigFile() {
         if (access_it != log_obj.end() && access_it->value().is_string()) {
             accessLogPath = std::string(access_it->value().as_string());
         }
+    }
+    if (accessLogPath.empty()) {
+        throw std::runtime_error("XRay config must contain access log file path");
     }
 }
 

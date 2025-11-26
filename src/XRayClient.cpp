@@ -1,134 +1,142 @@
 #include "XRayClient.h"
 #include "utils.h"
 #include <boost/log/trivial.hpp>
-#include <boost/json.hpp>
-#include <cstdio>
-#include <fstream>
 #include <regex>
 
 
-namespace json = boost::json;
+const int LINES_COUNT = 100; // @TODO: move number line to options
+const int TIME_DIFF_LIMIT = 60 * 60 * 2; // 2 hours @TODO: to options
 
-XRayClient::XRayClient(const Config& config, State& state)
-    : config(config), state(state) {
-}
+XRayClient::XRayClient(const Config& config) : config(config) {}
 
-bool XRayClient::queryStats() {
-    try {
-        std::string command = "xray api statsquery --server=" + config.apiAddress + ":" + std::to_string(config.apiPort);
-        std::string output = utils::executeCommand(command);
-
-        if (!output.empty()) {
-            parseStatsOutput(output);
-            return true;
-        }
-    }
-    catch (const std::exception& e) {
-        BOOST_LOG_TRIVIAL(warning) << "Error querying XRay stats: " + std::string(e.what());
-    }
-    return false;
-}
-
-void XRayClient::parseAccessLog() {
-    if (config.accessLogPath.empty() || state.getUsers().empty()) {
+void XRayClient::processAccessLog() {
+    if (config.accessLogPath.empty()) {
         BOOST_LOG_TRIVIAL(trace) 
-            << "No access log path `" << config.accessLogPath
-            << "` or connected users " << state.getUsers().size();
+            << "No access log path `"
+            << config.accessLogPath << "`";
         return;
     }
+    
+    std::vector<std::string> lines = parseTailAccessLog();
+    if (lines.empty()) {
+        return;
+    }
+
+    const std::regex logPattern(
+        R"((\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}\.\d+) )"
+        R"(from (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):\d+ )"
+        R"(accepted [^\s]+ (\[vless_tls >> direct\]) )"
+        R"(email: ([^\s]+))"
+    );
+    const int logPatCount = 5;
+    const std::time_t nowTs = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    std::unordered_set<std::string> processedEmails;
+
+    connected.clear();
+    disconnected.clear();
+    suspicious.clear();
+
+    for (auto it = lines.rbegin(); it != lines.rend(); ++it) {
+        std::smatch matches;
+        if (std::regex_search(*it, matches, logPattern) && matches.size() == logPatCount) {
+            std::time_t logTs = utils::parseDate(matches[1]);
+            std::string ip = matches[2];
+            std::string type = matches[3];
+            std::string email = matches[4];
+            std::string id = "";
+            if (type != "[vless_tls >> direct]") {
+                continue;
+            }
+            if (logTs == 0) {
+                BOOST_LOG_TRIVIAL(debug) << "Not parsed datetime: " << matches[1];
+                continue;
+            }
+            double diffSeconds = std::difftime(nowTs, logTs);
+            if (diffSeconds > TIME_DIFF_LIMIT) {
+                // Because lines are reverse reading and rest lines are also later
+                break;
+            }
+            auto userIt = config.users.find(email);
+            if (userIt == config.users.end()) {
+                // Unknown user
+                suspicious.insert(email);
+                continue;
+            }
+            else {
+                id = userIt->second.id;
+            }
+            // Skip if already processed this user in this run (ensure "each user only once")
+            if (processedEmails.count(email)) {
+                continue;
+            }
+            processedEmails.insert(email);
+
+            std::unordered_map<std::string, Peer>::iterator peerIt = peers.find(email);
+            if (peerIt == peers.end()) {
+                Peer peer{ id, email, ip, logTs, 0 };
+                peers.emplace(email, std::move(peer));
+            }
+            else {
+                // Update existing peer: only if this log entry is newer (should be, but safe-guard)
+                peerIt->second.ip = ip;
+                peerIt->second.prevTime = peerIt->second.lastTime;
+                peerIt->second.lastTime = logTs;
+            }
+        }
+    }
+
+    for (auto& [email, peer] : peers) {
+        if (processedEmails.count(peer.email) == 0) {
+            peer.lastTime = 0;
+        }
+        if (peer.lastTime == 0 && peer.prevTime != 0) {
+            peer.prevTime = 0;
+            disconnected.emplace_back(peer);
+        }
+        else if (peer.lastTime != 0 && peer.prevTime == 0) {
+            connected.emplace_back(peer);
+        }
+        else if (peer.lastTime != 0 && peer.prevTime != 0 &&
+            peer.lastTime - peer.prevTime > TIME_DIFF_LIMIT) {
+            disconnected.emplace_back(peer);
+        }
+    }
+}
+
+std::vector<std::string> XRayClient::parseTailAccessLog() {
     std::string output = "";
+    std::vector<std::string> lines;
     try {
-        // @TODO: move number line to options
-        std::string command = "tail -n 1000 " + config.accessLogPath;
+        std::string command = "tail -n " + std::to_string(LINES_COUNT) + " " + config.accessLogPath;
         output = utils::executeCommand(command);
         if (output.empty()) {
             BOOST_LOG_TRIVIAL(debug) << "Error reading XRay log, file empty";
-            return;
+            return lines;
         }
     }
     catch (const std::exception& e) {
-        BOOST_LOG_TRIVIAL(debug) << "Error reading XRay log: " + std::string(e.what());
-        return;
+        BOOST_LOG_TRIVIAL(debug)
+            << "Error reading XRay log: "
+            << std::string(e.what());
+        return lines;
     }
     std::istringstream iss(output);
-    std::vector<std::string> lines;
     std::string line;
-    std::regex logPattern(R"(from (\d+\.\d+\.\d+\.\d+):\d+ accepted .*? email: ([^\s]+))");
-    std::unordered_map<std::string, std::string> ips;
     while (std::getline(iss, line)) {
         lines.push_back(line);
     }
-    for (auto it = lines.rbegin(); it != lines.rend(); ++it) {
-        std::smatch matches;
-        if (std::regex_search(*it, matches, logPattern) && matches.size() == 3) {
-            std::string ip = matches[1];
-            std::string email = matches[2];
-            if (ips.find(email) == ips.end()) {
-                ips[email] = ip;
-            }
-        }
-    }
-    for (const auto& pair : state.getUsers()) {
-        std::string email = pair.second.email;
-        if (!ips.count(email)) {
-            continue;
-        }
-        std::string ip = ips[email];
-        state.updateUser(email, ip, pair.second.connected);
-    }
+    return lines;
 }
 
-void XRayClient::parseStatsOutput(const std::string& output) {
-    json::value j;
-    try {
-        j = json::parse(output);
-    }
-    catch (const std::exception& e) {
-        BOOST_LOG_TRIVIAL(warning) << "Wrong API JSON: " << std::string(e.what());
-        return;
-    }
-    json::object root = j.as_object();
-    if (auto it = root.find("stat"); it != root.end() && it->value().is_array()) {
-        json::array statArray = it->value().as_array();
-        state.disconnectAllUsers();
-        for (auto& item : statArray) {
-            if (!item.is_object()) continue;
-            json::object obj = item.as_object();
-            if (auto nameIt = obj.find("name"); nameIt != obj.end() && nameIt->value().is_string()) {
-                std::string name = nameIt->value().as_string().c_str();
-                if (name.substr(0, 4) == "user") {
-                    std::vector<std::string> parts;
-                    size_t start = 0;
-                    size_t pos;
-                    while ((pos = name.find(">>>", start)) != std::string::npos) {
-                        parts.push_back(name.substr(start, pos - start));
-                        start = pos + 3;
-                    }
-                    parts.push_back(name.substr(start));
-                    if (parts.size() >= 4) {
-                        std::string email = parts[1];
-                        std::string trafficType = parts.back();
-                        int64_t downlink = 0;
-                        int64_t uplink = 0;
-                        int64_t value = 0;
-                        if (trafficType == "downlink" || trafficType == "uplink") {
-                            if (auto valueIt = obj.find("value"); valueIt != obj.end() && valueIt->value().is_int64()) {
-                                value = valueIt->value().as_int64();
-                            }
-                        }
-                        if (trafficType == "downlink") {
-                            downlink = value;
-                        }
-                        else if (trafficType == "uplink") {
-                            uplink = value;
-                        }
-                        if (downlink || uplink) {
-                            state.updateUser(email, "", true, downlink, uplink);
-                            BOOST_LOG_TRIVIAL(trace) << "User: " << email << " " << trafficType << " = " << value;
-                        }
-                    }
-                }
-            }
-        }
-    }
+
+std::vector<Peer> XRayClient::getConnected() {
+    return connected;
+}
+
+std::vector<Peer> XRayClient::getDisconnected() {
+    return disconnected;
+}
+
+std::unordered_set<std::string> XRayClient::getSuspicious() {
+    return suspicious;
 }

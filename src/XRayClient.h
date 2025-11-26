@@ -2,21 +2,36 @@
 #define XRAYCLIENT_H
 
 #include "Config.h"
-#include "State.h"
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
+#include <ctime>
 
+
+struct Peer {
+    std::string id;
+    std::string email;
+    std::string ip;
+    std::time_t lastTime = 0;
+    std::time_t prevTime = 0;
+};
 
 class XRayClient {
 public:
-    XRayClient(const Config& config, State& state);
-    bool queryStats();
-    void parseAccessLog();
+    XRayClient(const Config& config);
+    void processAccessLog();
+    std::vector<Peer> getConnected();
+    std::vector<Peer> getDisconnected();
+    std::unordered_set<std::string> getSuspicious();
 
 private:
     const Config& config;
-    State& state;
-    void parseStatsOutput(const std::string& output);
+    std::unordered_map<std::string, Peer> peers;
+    std::vector<Peer> connected;
+    std::vector<Peer> disconnected;
+    std::unordered_set<std::string> suspicious;
+    std::vector<std::string> parseTailAccessLog();
 };
 
 #endif
