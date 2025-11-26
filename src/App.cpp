@@ -96,17 +96,14 @@ void App::sendStartupMessage() {
     }
     else {
         telegramMsg << "Users are already connected to the server:\n";
-        telegramMsg << "| email | ID | IP | time |\n";
-        telegramMsg << "| --- | --- | --- | --- |\n";
         logMsg << "Xray connection monitoring has been launched. Connected users: ";
     }
 
     bool firstUser = true;
     for (const auto& user : users) {
-        telegramMsg << "| "
-            << utils::escapeMDv2(user.email) << " | "
-            << utils::escapeMDv2(user.id) << " | "
-            << utils::escapeMDv2(user.ip) << " |\n";
+        telegramMsg << utils::escapeMDv2(user.email) << utils::escapeMDv2(" | ")
+            << utils::escapeMDv2(user.id) << utils::escapeMDv2(" | ")
+            << utils::escapeMDv2(user.ip) << "\n";
         if (!firstUser) {
             logMsg << ", ";
         }
@@ -126,15 +123,11 @@ void App::sendNewConnectionMessage() {
     std::stringstream telegramMsg;
     std::stringstream logMsg;
     telegramMsg << "🔗 *Users have connected to the xray server:*\n";
-    telegramMsg << "| email | ID | IP | time |\n";
-    telegramMsg << "| --- | --- | --- | --- |\n";
     for (const auto& user : users) {
-        telegramMsg << "| "
-            << utils::escapeMDv2(user.email) << " | "
-            << utils::escapeMDv2(user.id) << " | "
-            << utils::escapeMDv2(user.ip) << " | "
-            << utils::escapeMDv2(utils::formatTime(user.lastTime))
-            << " |\n";
+        telegramMsg << utils::escapeMDv2(user.email) << utils::escapeMDv2(" | ")
+            << utils::escapeMDv2(user.id) << utils::escapeMDv2(" | ")
+            << utils::escapeMDv2(user.ip) << utils::escapeMDv2(" | ")
+            << utils::escapeMDv2(utils::formatTime(user.lastTime)) << "\n";
 
         logMsg << "New connection: "
             << user.email
@@ -155,13 +148,10 @@ void App::sendDisconnectionMessage() {
     std::stringstream telegramMsg;
     std::stringstream logMsg;
     telegramMsg << "❌ *Users have disconnected from the xray server:*\n";
-    telegramMsg << "| email | ID | IP |\n";
-    telegramMsg << "| --- | --- | --- |\n";
     for (const auto& user : users) {
-        telegramMsg << "| "
-            << utils::escapeMDv2(user.email) << " | "
-            << utils::escapeMDv2(user.id) << " | "
-            << utils::escapeMDv2(user.ip) << " |\n";
+        telegramMsg << utils::escapeMDv2(user.email) << utils::escapeMDv2(" | ")
+            << utils::escapeMDv2(user.id) << utils::escapeMDv2(" | ")
+            << utils::escapeMDv2(user.ip) << "\n";
 
         logMsg << "Discconnection: "
             << user.email
