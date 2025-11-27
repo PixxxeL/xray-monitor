@@ -5,6 +5,7 @@
 #include <boost/log/utility/setup/common_attributes.hpp>
 #include <boost/log/expressions.hpp>
 #include <boost/dll/runtime_symbol_info.hpp>
+#include <ios>
 #include "logger.h"
 #include "utils.h"
 
@@ -24,6 +25,7 @@ static logging::trivial::severity_level stringToSeverity(const std::string& leve
 }
 
 void initLogging(const std::string filePath, const std::string level) {
+    logging::add_common_attributes();
     // to console
     auto consoleHandler = logging::add_console_log();
     logging::trivial::severity_level levelSeverity = stringToSeverity(level);
@@ -33,16 +35,19 @@ void initLogging(const std::string filePath, const std::string level) {
         utils::ensurePathExists(filePath);
         auto fileHandler = logging::add_file_log(
             keywords::file_name = filePath,
-            keywords::rotation_size = 10 * 1024 * 1024,
-            keywords::max_size = 50 * 1024 * 1024,
+            keywords::auto_flush = true,
+            keywords::open_mode = std::ios::app,
+            // @TODO: add smart method making filePath with placeholder
+            // then log rotation may on back
+            //keywords::rotation_size = 10 * 1024 * 1024,
+            //keywords::max_size = 50 * 1024 * 1024,
             keywords::format = (
                 expr::stream
                 << expr::format_date_time< boost::posix_time::ptime >("TimeStamp", "%Y-%m-%d %H:%M:%S")
                 << " [" << logging::trivial::severity
                 << "] " << expr::smessage
-                )
+            )
         );
         fileHandler->set_filter(logging::trivial::severity >= levelSeverity);
     }
-    logging::add_common_attributes();
 }
