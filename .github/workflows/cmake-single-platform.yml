@@ -4,9 +4,11 @@ name: CMake on a single platform (Linux)
 
 on:
   push:
-    branches: [ "master" ]
+    tags:
+      - '[0-9]+\.[0-9]+\.[0-9]+.*'
   pull_request:
-    branches: [ "master" ]
+    tags:
+      - '[0-9]+\.[0-9]+\.[0-9]+.*'
 
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
@@ -32,14 +34,16 @@ jobs:
           libboost-program-options-dev
 
     - name: Configure CMake
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DSTATIC_BUILD=ON
+      run: cmake -B ${{ github.workspace }}/build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DSTATIC_BUILD=ON
 
     - name: Build
-      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+      run: cmake --build ${{ github.workspace }}/build --config ${{ env.BUILD_TYPE }}
 
     - name: Artifact to Releases
       uses: softprops/action-gh-release@v2
       with:
         files: |
-          ${{github.workspace}}/build/xray-monitor
+          ${{ github.workspace }}/build/xray-monitor
+        tag_name: ${{ env.TAG }}
+        name: ${{ env.TAG }}
         generate_release_notes: true
