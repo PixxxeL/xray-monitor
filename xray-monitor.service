@@ -4,8 +4,10 @@ After=network.target xray.service
 
 [Service]
 Type=simple
-User=root
-ExecStart=/usr/local/bin/xray-monitor
+User=xray
+ExecStart=/usr/local/bin/xray-monitor \
+    --log-filepath=/var/log/xray/monitor.log
+    --interval=3
 Restart=on-failure
 StandardOutput=journal
 StandardError=journal

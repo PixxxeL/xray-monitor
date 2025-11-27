@@ -138,9 +138,9 @@ void Config::parseConfigFile() {
             }
         }
     }
-    if (!hasStatsService) {
-        throw std::runtime_error("XRay config must contain api.services with StatsService");
-    }
+    //if (!hasStatsService) {
+    //    throw std::runtime_error("XRay config must contain api.services with StatsService");
+    //}
 
     parseInbounds(root);
 
@@ -186,12 +186,12 @@ void Config::parseInbounds(const json::object& root) {
         }
     }
 
-    if (!foundDokodemo) {
-        throw std::runtime_error("XRay config must contain dokodemo-door inbound for API access");
-    }
-    if (apiPort <= 0 || apiPort > 65535) {
-        throw std::runtime_error("Invalid API port: " + std::to_string(apiPort));
-    }
+    //if (!foundDokodemo) {
+    //    throw std::runtime_error("XRay config must contain dokodemo-door inbound for API access");
+    //}
+    //if (apiPort <= 0 || apiPort > 65535) {
+    //    throw std::runtime_error("Invalid API port: " + std::to_string(apiPort));
+    //}
 }
 
 void Config::parseUsers(const json::object& root) {
