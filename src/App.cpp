@@ -2,6 +2,7 @@
 #include "logger.h"
 #include "utils.h"
 #include "Config.h"
+#include "version.h"
 #include <csignal>
 #include <thread>
 #include <sstream>
@@ -51,7 +52,7 @@ int App::run() {
 
 void App::initialize() {
     initLogging(config.logFilePath, config.logLevelStr);
-    BOOST_LOG_TRIVIAL(info) << "Starting XRay Monitor";
+    BOOST_LOG_TRIVIAL(info) << "Starting XRay Monitor " << VERSION_STRING;
 
     config.parseConfigFile();
     BOOST_LOG_TRIVIAL(info)
